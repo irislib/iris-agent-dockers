@@ -17,6 +17,13 @@ loader.exec_module(cli)
 
 
 class Routing(unittest.TestCase):
+    def test_setup_and_chat_status_never_target_opencode(self):
+        with patch.object(cli.opencode, 'main', side_effect=AssertionError('OpenCode must stay untouched')), patch.object(cli.onboarding, 'setup', return_value=0) as setup, patch.object(cli.onboarding, 'show_status', return_value=0) as status:
+            self.assertEqual(cli.main(['setup']), 0)
+            self.assertEqual(cli.main(['chat-status']), 0)
+        setup.assert_called_once_with(None, owner=None, invite=None, model=None)
+        status.assert_called_once_with(('hermes', 'openclaw'))
+
     def test_shortcuts_preserve_literal_terminal_arguments(self):
         with patch.object(cli.chat, 'main', return_value=0) as chat:
             cli.main(['hermes', '--', '-lc', 'printf "%s" "$(literal)"'])

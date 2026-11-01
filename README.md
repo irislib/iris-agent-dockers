@@ -14,23 +14,29 @@ natively on ARM64. Other hosts need Docker's equivalent emulation or a matching
 released Iris binary, and a reachable Ollama host alias.
 
 ```sh
-cp .env.example .env
-# Set KAT_MODEL to the exact installed tag shown by `ollama list`.
-./agents build
-./agents up hermes
-./agents up openclaw
-./agents pair hermes --owner YOUR_NPUB
-./agents pair openclaw --owner YOUR_NPUB
+./agents setup --owner YOUR_NPUB
 ```
 
-Pairing asks for your private Iris invite without echoing it. Use the same
-personal invite for both agents. The returned direct-chat identity must exactly
+Setup detects a single installed KAT model, builds missing images, starts both
+chat agents, and asks for your private Iris invite once without echoing it.
+It does not download models. To select a different installed tag on first setup,
+add `--model MODEL`; use `setup hermes` or `setup openclaw` to set up just one.
+Existing `.env` model and network settings are preserved.
+
+The returned direct-chat identity must exactly
 match `--owner`, or pairing fails. No person's keys or existing Iris profile
 are imported. Each agent's transport creates its own identity once and retains
 it in a Docker volume. Each agent sends a short introduction automatically. Send a message in either chat to run a task.
 
+Rerun `agents setup` at any time to start or finish setup. It reuses the approved
+contact, retains existing containers and sessions, and does not pair again or
+send another introduction for an already-paired agent. It does not create or
+change OpenCode containers. An existing agent's contact policy cannot be changed
+through setup.
+
 ```sh
 ./agents status
+./agents chat-status
 ./agents hermes
 ./agents openclaw
 ./agents logs hermes
@@ -47,6 +53,8 @@ agents opencode                  # OpenCode's persistent tmux terminal
 agents hermes                    # Hermes container shell
 agents openclaw                  # OpenClaw container shell
 agents status                    # All three and their helpers
+agents chat-status               # Iris readiness, task counts and last reply receipt
+agents setup                     # Start/resume chat setup; preserve existing pairing
 agents stop hermes               # Only Hermes and its private helpers
 agents up hermes                 # Start Hermes; retain its existing container
 agents opencode --workspace demo # Separate OpenCode workspace
@@ -126,6 +134,11 @@ sending; retries inspect Iris history to avoid duplicate sends.
 when the recipient acknowledges a message. Text tasks and replies are supported;
 attachments are not downloaded or executed automatically.
 
+`agents chat-status [hermes|openclaw|all]` reports readiness, completed and active
+task counts (including the introduction), recorded task errors, and the latest
+outgoing reply receipt. This is read-only operator access: it does not print
+message contents, keys or invites, and does not add an agent-accessible API.
+
 For diagnostics, the agent's `iris-bridge/last-error.log` and
 `iris-bridge/last-turn.jsonl` live in its private home volume. The transport's
 `/state/transport.log` stays in its own volume. Never publish those files,
@@ -160,6 +173,13 @@ is useful for agents with direct CLI access. These containers deliberately keep
 the CLI and credentials in the transport, so their agent-facing instruction is
 simply to complete the task and return the reply. This is a standalone adapter,
 not an upstream-maintained Hermes or OpenClaw channel plugin.
+
+Native channel plugins are not required for this text-task workflow. They would
+be a useful next step for attachments, typing indicators, and scheduled messages
+through the agents' gateway delivery systems. Both
+[Hermes platform plugins](https://hermes-agent.nousresearch.com/docs/developer-guide/adding-platform-adapters)
+and [OpenClaw channel plugins](https://docs.openclaw.ai/plugins/building-plugins)
+can ship independently; no core pull request is needed for the current adapter.
 
 References: [Hermes plugins](https://hermes-agent.nousresearch.com/docs/developer-guide/plugins),
 [Hermes Docker](https://hermes-agent.nousresearch.com/docs/user-guide/docker),

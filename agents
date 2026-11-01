@@ -7,7 +7,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-from launchers import chat, opencode
+from launchers import chat, opencode, onboarding
 
 NAMES = ('opencode', 'hermes', 'openclaw')
 
@@ -19,6 +19,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, epilog=(
         'Examples: agents opencode | agents hermes | agents status | agents stop hermes'))
     commands = parser.add_subparsers(dest='action')
+    setup = commands.add_parser('setup', help='Set up Iris chat for Hermes/OpenClaw; safe to rerun')
+    setup.add_argument('agent', nargs='?', choices=(*chat.AGENTS, 'all'), default='all')
+    setup.add_argument('--owner', help='Your only allowed Iris contact (npub); reused on later runs')
+    setup.add_argument('--invite', help='Private invite; omit to enter without echo')
+    setup.add_argument('--model', help='Installed Ollama model; defaults to saved model or unique KAT tag')
+    status = commands.add_parser('chat-status', help='Show Iris readiness, task queue and reply receipts')
+    status.add_argument('agent', nargs='?', choices=(*chat.AGENTS, 'all'), default='all')
     for name in NAMES:
         entry = commands.add_parser(name, help=f'Open the {name} terminal')
         if name == 'opencode':
@@ -54,6 +61,10 @@ def main(argv=None):
         args.agent, args.action = args.action, 'shell'
     if shell_args and args.action != 'shell':
         parser.error('Arguments after -- are only supported for terminals.')
+    if args.action == 'setup':
+        return onboarding.setup(None if args.agent == 'all' else args.agent, owner=args.owner, invite=args.invite, model=args.model)
+    if args.action == 'chat-status':
+        return onboarding.show_status(chat.AGENTS if args.agent == 'all' else (args.agent,))
     workspace = getattr(args, 'workspace', 'default')
     if workspace != 'default' and args.agent not in ('opencode', 'all'):
         parser.error('--workspace is only supported for OpenCode.')
@@ -86,5 +97,8 @@ if __name__ == '__main__':
     except subprocess.CalledProcessError as error:
         print(f'Command failed (exit {error.returncode}); containers and data are preserved.', file=sys.stderr)
         sys.exit(error.returncode)
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)
     except KeyboardInterrupt:
         sys.exit(130)
