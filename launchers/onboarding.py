@@ -101,11 +101,11 @@ def status_line(agent, state):
     elif not state.get('service_ready') or not state.get('bridge_ready'):
         readiness = 'connecting'
     else:
-        readiness = 'working' if active else 'ready'
+        readiness = 'working' if active or state.get('working') else 'ready'
     receipt = {'seen':'last reply seen', 'received':'last reply delivered',
                'sent':'last reply sent; receipt unconfirmed', 'queued':'last reply queued',
                'pending':'last reply pending', 'failed':'last reply failed'}.get(state.get('last_delivery'), 'no confirmed reply receipt')
-    pieces = [f'{agent}: {readiness}', f'{counts.get("done",0)} completed', receipt]
+    pieces = [f'{agent}: {readiness}', f'{counts.get("done",0)} handled', receipt]
     if active:
         pieces.append(f'{active} active/queued')
     if state.get('reported_errors'):

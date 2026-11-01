@@ -48,7 +48,9 @@ def collect():
     if result['paired']:
         try:
             with urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=3) as response:
-                result['bridge_ready'] = json.load(response).get('paired') is True
+                health = json.load(response)
+                result['bridge_ready'] = health.get('paired') is True
+                result['working'] = health.get('working', False)
         except Exception:
             pass
     if (STATE / 'bridge.sqlite3').exists():

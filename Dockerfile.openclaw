@@ -1,7 +1,9 @@
+FROM --platform=linux/amd64 iris-agent-support:local AS channels
 FROM ghcr.io/openclaw/openclaw@sha256:1a2a3ce113e435039dbeac5ae261759bb4759908563d91c81059e896b38c5d98
 USER root
 COPY runtime /opt/iris-agent
+COPY --from=channels /opt/iris-channels /opt/iris-channels
 ENV HOME=/data OPENCLAW_STATE_DIR=/data/.openclaw PYTHONUNBUFFERED=1
 WORKDIR /workspace
 HEALTHCHECK NONE
-ENTRYPOINT ["python3", "/opt/iris-agent/worker.py"]
+ENTRYPOINT ["python3", "/opt/iris-agent/gateway.py"]

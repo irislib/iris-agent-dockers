@@ -1,4 +1,9 @@
 FROM debian:trixie-20261020@sha256:4c25275446ca371766b8b093c696782eabce06263fccacb8d5d813b3dc44b308
 RUN rm /etc/apt/sources.list.d/debian.sources && printf 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20261025T000000Z/ trixie main\n' > /etc/apt/sources.list && apt-get -o Acquire::Retries=3 update && apt-get install -y --no-install-recommends python3 ca-certificates curl iptables tini && rm -rf /var/lib/apt/lists/*
+ARG CHANNEL_RELEASE=https://github.com/irislib/iris-chat-channels/releases/download/v0.1.0
+ARG OPENCLAW_CHANNEL_SHA256=e4f4b07f988006694498f12bc29019cd8793f3b7498ef6fa79c754e96acdd285
+ARG HERMES_CHANNEL_SHA256=95c112139cec43efe43488fdd4248df53acc743f77c6210cb29fca2912f8a2fa
+RUN mkdir -p /opt/iris-channels/hermes /opt/iris-channels/openclaw && curl -fsSL --retry 3 "$CHANNEL_RELEASE/iris-hermes-0.1.0.tgz" -o /tmp/hermes.tgz && echo "$HERMES_CHANNEL_SHA256  /tmp/hermes.tgz" | sha256sum -c - && tar -xzf /tmp/hermes.tgz -C /opt/iris-channels/hermes && curl -fsSL --retry 3 "$CHANNEL_RELEASE/iris-openclaw-0.1.0.tgz" -o /opt/iris-channels/openclaw.tgz && echo "$OPENCLAW_CHANNEL_SHA256  /opt/iris-channels/openclaw.tgz" | sha256sum -c - && rm /tmp/hermes.tgz
 COPY runtime /opt/iris-agent
+RUN cp /opt/iris-channels/hermes/transport.py /opt/iris-agent/channel_transport.py
 ENTRYPOINT ["tini", "--"]

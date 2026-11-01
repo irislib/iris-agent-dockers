@@ -3,6 +3,7 @@
 Only one authenticated direct-chat ID is accepted. There is deliberately no
 recipient argument, invite endpoint, arbitrary CLI endpoint or credential API.
 """
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -14,6 +15,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 STATE = Path(os.environ.get('BRIDGE_STATE','/state'))
 LOCK = threading.RLock()
+CHANNEL = None
+CHANNEL_LOOP = None
 
 def iris(*args, timeout=90):
     result = subprocess.run(['iris','--json','--no-background-sync',*args], capture_output=True, text=True, timeout=timeout)
@@ -98,7 +101,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if self.path == '/health':
                 p = pairing()
-                self.respond(200,{'paired':True}); return
+                self.respond(200,{'paired':True, 'working': bool(CHANNEL and time.monotonic()-CHANNEL.last_typing < 10)}); return
             if self.path != '/next':
                 self.respond(404,{}); return
             pairing()
@@ -117,6 +120,17 @@ class Handler(BaseHTTPRequestHandler):
         except FileNotFoundError: self.respond(503,{'error':'Not paired'})
         except Exception: self.respond(503,{'error':'Transport unavailable'})
     def do_POST(self):
+        if self.path.startswith('/channel/'):
+            try:
+                n=int(self.headers.get('Content-Length',0))
+                if not 0<n<262144 or self.headers.get('Transfer-Encoding'): raise ValueError()
+                payload=json.loads(self.rfile.read(n))
+                if not isinstance(payload,dict): raise ValueError()
+                future=asyncio.run_coroutine_threadsafe(CHANNEL.operation(self.path.removeprefix('/channel/'),payload),CHANNEL_LOOP)
+                self.respond(200,{'ok':True,'result':future.result(timeout=55)})
+            except (ValueError,KeyError,TypeError): self.respond(403,{'ok':False,'error':'Request is not allowed'})
+            except Exception: self.respond(503,{'ok':False,'error':'Iris operation unconfirmed; check transport diagnostics'})
+            return
         if self.path != '/complete': self.respond(404,{}); return
         try:
             n=int(self.headers.get('Content-Length',0))
@@ -134,6 +148,8 @@ def poll():
         time.sleep(4)
 
 def main():
+    global CHANNEL, CHANNEL_LOOP
+    from channel_transport import Transport
     os.umask(0o077)
     STATE.mkdir(parents=True,exist_ok=True)
     # Never replace an existing identity. Only initialize a new, empty profile.
@@ -152,12 +168,18 @@ def main():
         except Exception: pass
         time.sleep(1)
     if not ready: raise RuntimeError('Iris service did not become ready')
+    # The broker owns the service and profile. Both native plugins use the same
+    # strict transport protocol without receiving keys or a recipient argument.
+    CHANNEL=Transport(STATE,profile_dir=profile)
+    CHANNEL_LOOP=asyncio.new_event_loop()
+    threading.Thread(target=CHANNEL_LOOP.run_forever,daemon=True).start()
     with connect(): pass
     def supervise():
         service.wait()
         os._exit(1)
     threading.Thread(target=supervise,daemon=True).start()
-    threading.Thread(target=poll,daemon=True).start()
+    # Native receive polls history itself. The legacy endpoint remains available
+    # for a controlled rollback, but no second worker polls concurrently.
     print('Iris transport started; owner-only bridge listening',flush=True)
     ThreadingHTTPServer(('127.0.0.1',8765),Handler).serve_forever()
 

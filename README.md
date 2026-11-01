@@ -2,8 +2,9 @@
 
 Manage persistent OpenCode, Hermes and OpenClaw containers with one `agents` command.
 Hermes and OpenClaw use a local Ollama model and separate encrypted Iris chats. No hosted model account is needed.
-The adapter invokes the agents' supported CLIs and preserves their sessions.
-It does not replace either agent with a simple chatbot.
+Both run their normal gateways with the published
+[native Iris plugins](https://github.com/irislib/iris-chat-channels).
+For an existing Hermes/OpenClaw installation without Docker, use that plugin's setup guide.
 
 ## Start
 
@@ -125,22 +126,27 @@ Outgoing messages, other chats, groups, empty messages and deleted messages do
 not trigger the agent. The broker persists processed message IDs; restarts do
 not replay completed tasks. Replies can only go to the paired owner.
 
-A task interrupted during execution is not automatically replayed because it may
-already have changed files or contacted a website. The worker reports the
-interruption and waits for a new instruction. Reply intent is recorded before
-sending; retries inspect Iris history to avoid duplicate sends.
+A task claimed but not handed off when the transport stops is reported as
+interrupted rather than replayed. After handoff, the native gateway owns its
+queue, sessions and recovery. Reply intent is recorded before sending;
+retries inspect Iris history rather than blindly resending.
+
+Typing stays active while processing, including tool calls, and clears after
+completion, failure or stop. Iris expires a stale indicator if connectivity is lost.
 
 `sent` is not recipient delivery confirmation. Iris reports `received` or `seen`
 when the recipient acknowledges a message. Text tasks and replies are supported;
 attachments are not downloaded or executed automatically.
 
-`agents chat-status [hermes|openclaw|all]` reports readiness, completed and active
+`agents chat-status [hermes|openclaw|all]` reports readiness, handled and active
 task counts (including the introduction), recorded task errors, and the latest
 outgoing reply receipt. This is read-only operator access: it does not print
 message contents, keys or invites, and does not add an agent-accessible API.
 
-For diagnostics, the agent's `iris-bridge/last-error.log` and
-`iris-bridge/last-turn.jsonl` live in its private home volume. The transport's
+For diagnostics, use `agents logs hermes` or `agents logs openclaw`. Legacy CLI
+conversation state remains in the private `iris-bridge` directory; the first
+native gateway start opens a fresh channel session. Existing identities,
+workspaces, models and stored conversations are retained. The transport's
 `/state/transport.log` stays in its own volume. Never publish those files,
 `.env`, the pairing file, or Iris profiles.
 
@@ -148,6 +154,8 @@ For diagnostics, the agent's `iris-bridge/last-error.log` and
 
 - Hermes official image: v0.22.5, source `bf0203a794a07aac3ff764972ab9087baa4e4f4e`.
 - OpenClaw official image: 2026.10.9, source `8b18b5578f66eab1501cba4cef2310d88bfb9a41`.
+- Iris channel plugins: v0.1.0, source `e52a5a95c770472d45e8ff3a9b706faab28ecf7e`;
+  both archives are pinned by SHA-256 and verified before extraction.
 - Both upstream images and the Debian support image are pinned by OCI digest in
   the Dockerfiles. Support packages use the signed Debian snapshot from
   2026-10-25. Iris v2026.10.30 is pinned by archive SHA-256 and checked before use.
@@ -171,15 +179,8 @@ pipe a task on stdin; the output stays in the terminal rather than being sent.
 The portable [Iris skill](https://github.com/irislib/iris-chat-rs/tree/main/plugins/iris-chat)
 is useful for agents with direct CLI access. These containers deliberately keep
 the CLI and credentials in the transport, so their agent-facing instruction is
-simply to complete the task and return the reply. This is a standalone adapter,
-not an upstream-maintained Hermes or OpenClaw channel plugin.
-
-Native channel plugins are not required for this text-task workflow. They would
-be a useful next step for attachments, typing indicators, and scheduled messages
-through the agents' gateway delivery systems. Both
-[Hermes platform plugins](https://hermes-agent.nousresearch.com/docs/developer-guide/adding-platform-adapters)
-and [OpenClaw channel plugins](https://docs.openclaw.ai/plugins/building-plugins)
-can ship independently; no core pull request is needed for the current adapter.
+simply to complete the task and return the reply. The native plugins are independently
+maintained community integrations; no upstream core patch is required.
 
 References: [Hermes plugins](https://hermes-agent.nousresearch.com/docs/developer-guide/plugins),
 [Hermes Docker](https://hermes-agent.nousresearch.com/docs/user-guide/docker),

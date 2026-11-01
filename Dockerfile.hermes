@@ -1,7 +1,9 @@
+FROM --platform=linux/amd64 iris-agent-support:local AS channels
 FROM nousresearch/hermes-agent@sha256:9c5561579f3ffdf333401797094ac3a743738d6c25d40f4331c7bf77b694238d
 USER root
 RUN chown -R 0:0 /opt/data
 COPY runtime /opt/iris-agent
+COPY --from=channels /opt/iris-channels /opt/iris-channels
 ENV HOME=/opt/data HERMES_HOME=/opt/data PYTHONUNBUFFERED=1 HERMES_YOLO_MODE=1 HERMES_DOCKER_EXEC_AS_ROOT=1 HERMES_ALLOW_ROOT_GATEWAY=1
 WORKDIR /workspace
-ENTRYPOINT ["python3", "/opt/iris-agent/worker.py"]
+ENTRYPOINT ["python3", "/opt/iris-agent/gateway.py"]
