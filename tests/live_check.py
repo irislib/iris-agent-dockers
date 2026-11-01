@@ -34,7 +34,10 @@ checks['no-new-privileges']='NoNewPrivs:\t1' in status
 print(json.dumps(checks))
 assert all(checks.values()), checks
 '''
-for agent in ('hermes','openclaw'):
+selected = sys.argv[1:] or ['hermes', 'openclaw']
+if any(agent not in ('hermes', 'openclaw') for agent in selected):
+    raise SystemExit('Expected hermes or openclaw')
+for agent in selected:
     result=subprocess.run(compose+['exec','-T',agent,'python3','-c',probe],capture_output=True,text=True)
     if result.returncode:
         print(agent,result.stdout,result.stderr);sys.exit(1)

@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""One command for persistent OpenCode, Hermes and OpenClaw containers."""
+import argparse
+from pathlib import Path
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+from launchers import chat, opencode
+
+NAMES = ('opencode', 'hermes', 'openclaw')
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    split = argv.index('--') if '--' in argv else len(argv)
+    shell_args = argv[split + 1:]
+    parser = argparse.ArgumentParser(description=__doc__, epilog=(
+        'Examples: agents opencode | agents hermes | agents status | agents stop hermes'))
+    commands = parser.add_subparsers(dest='action')
+    for name in NAMES:
+        entry = commands.add_parser(name, help=f'Open the {name} terminal')
+        if name == 'opencode':
+            entry.add_argument('--workspace', default='default', help='Named OpenCode workspace')
+    for action, help_text in (
+        ('shell', 'Open an agent terminal'), ('status', 'Show containers'),
+        ('up', 'Start containers without replacing them'), ('stop', 'Stop; keep files and sessions'),
+        ('logs', 'Follow an agent’s logs'), ('check', 'Check connectivity and isolation'),
+        ('build', 'Build Hermes/OpenClaw images; does not restart containers'),
+        ('pair', 'Connect an Iris chat to its one allowed contact'),
+    ):
+        cmd = commands.add_parser(action, help=help_text)
+        if action in ('build', 'pair'):
+            choices = chat.AGENTS
+        else:
+            choices = NAMES
+        if action in ('status', 'up', 'stop', 'check'):
+            cmd.add_argument('agent', nargs='?', choices=(*choices, 'all'), default='all')
+        elif action == 'build':
+            cmd.add_argument('agent', nargs='?', choices=(*choices, 'all'), default='all')
+        else:
+            cmd.add_argument('agent', choices=choices)
+        if action not in ('build', 'pair'):
+            cmd.add_argument('--workspace', default='default', help='Named OpenCode workspace')
+        if action == 'pair':
+            cmd.add_argument('--owner', required=True, help='Only permitted Iris contact (npub)')
+            cmd.add_argument('--invite', help='Private invite; omit to enter without echo')
+    args = parser.parse_args(argv[:split])
+    if not args.action:
+        parser.print_help()
+        return 0
+    if args.action in NAMES:
+        args.agent, args.action = args.action, 'shell'
+    if shell_args and args.action != 'shell':
+        parser.error('Arguments after -- are only supported for terminals.')
+    workspace = getattr(args, 'workspace', 'default')
+    if workspace != 'default' and args.agent not in ('opencode', 'all'):
+        parser.error('--workspace is only supported for OpenCode.')
+    if args.agent == 'all':
+        if args.action != 'build':
+            result = run_opencode(args.action, workspace)
+            if result:
+                return result
+        return chat.main(args.action)
+    if args.agent == 'opencode':
+        return run_opencode(args.action, workspace, shell_args)
+    return chat.main(args.action, args.agent, owner=getattr(args, 'owner', None),
+                     invite=getattr(args, 'invite', None), shell_args=shell_args)
+
+
+def run_opencode(action, workspace, shell_args=()):
+    args = ['--doctor'] if action == 'check' else [action]
+    args += ['--workspace', workspace]
+    if shell_args:
+        args += ['--', *shell_args]
+    return opencode.main(args)
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except FileNotFoundError as error:
+        print(f'Missing command or file: {error.filename}', file=sys.stderr)
+        sys.exit(1)
+    except subprocess.CalledProcessError as error:
+        print(f'Command failed (exit {error.returncode}); containers and data are preserved.', file=sys.stderr)
+        sys.exit(error.returncode)
+    except KeyboardInterrupt:
+        sys.exit(130)

@@ -1,7 +1,7 @@
-# Iris agent containers
+# Local agent containers
 
-Run persistent Hermes and OpenClaw agents with a local Ollama model, and talk to
-both through separate encrypted Iris chats. No hosted model account is needed.
+Manage persistent OpenCode, Hermes and OpenClaw containers with one `agents` command.
+Hermes and OpenClaw use a local Ollama model and separate encrypted Iris chats. No hosted model account is needed.
 The adapter invokes the agents' supported CLIs and preserves their sessions.
 It does not replace either agent with a simple chatbot.
 
@@ -16,10 +16,11 @@ released Iris binary, and a reachable Ollama host alias.
 ```sh
 cp .env.example .env
 # Set KAT_MODEL to the exact installed tag shown by `ollama list`.
-./iris-agents build
-./iris-agents up
-./iris-agents pair hermes --owner YOUR_NPUB
-./iris-agents pair openclaw --owner YOUR_NPUB
+./agents build
+./agents up hermes
+./agents up openclaw
+./agents pair hermes --owner YOUR_NPUB
+./agents pair openclaw --owner YOUR_NPUB
 ```
 
 Pairing asks for your private Iris invite without echoing it. Use the same
@@ -29,21 +30,58 @@ are imported. Each agent's transport creates its own identity once and retains
 it in a Docker volume. Each agent sends a short introduction automatically. Send a message in either chat to run a task.
 
 ```sh
-./iris-agents status
-./iris-agents shell hermes
-./iris-agents shell openclaw
-./iris-agents logs hermes
-./iris-agents stop
-./iris-agents up
-./iris-agents check
+./agents status
+./agents hermes
+./agents openclaw
+./agents logs hermes
+./agents stop
+./agents up
+./agents check
 ```
 
+Run the script from this directory, or symlink `agents` into a directory on your
+`PATH`. It resolves its own location, so you can call it from any working directory.
+
+```sh
+agents opencode                  # OpenCode's persistent tmux terminal
+agents hermes                    # Hermes container shell
+agents openclaw                  # OpenClaw container shell
+agents status                    # All three and their helpers
+agents stop hermes               # Only Hermes and its private helpers
+agents up hermes                 # Start Hermes; retain its existing container
+agents opencode --workspace demo # Separate OpenCode workspace
+agents check opencode            # OpenCode/Ollama checks
+agents check hermes              # Hermes isolation checks
+```
+
+`status`, `up`, `stop` and `check` accept an agent name or `all` (the default).
+`build` builds Hermes/OpenClaw images; `pair` applies only to those two agents.
+OpenCode uses its pinned upstream image. Existing container names and volume names
+are deliberately retained, including names beginning `oc-local` and `iris-agents`.
+The previous launcher names are replaced by `agents`.
+
 Closing a shell does not stop the agents. `stop` preserves containers and volumes.
-`up` resumes them. Rebuilding and `up` preserve workspaces, conversations and
-identities. Do not remove volumes unless you intend to lose that state.
+`up` resumes them without replacing existing containers. `build` prepares new
+images but does not deploy them. To apply an image update, wait until tasks are
+idle and explicitly recreate the affected services with Docker Compose; their
+named volumes retain workspaces, conversations and identities. Do not remove volumes unless you intend to lose that state.
 Do not use `docker compose down -v` as a restart command.
 
-## Boundaries
+## OpenCode
+
+`agents opencode` reconnects to the existing `work` tmux session. Inside it, run
+`opencode`; choose the local model using `/models`. Detach with Ctrl+B, then D.
+OpenCode, its installed tools and tmux stay in the persistent container. A stop
+ends running processes but preserves the container and its named volumes.
+
+**OpenCode keeps its existing networking; it does not inherit the stricter chat-agent
+firewall.** It can reach host Ollama and private networks. Its launcher retains
+NET_ADMIN and TUN access for existing VPN setups, but does not install or enroll a
+VPN in a new workspace. Existing VPN configuration stays in its separate named
+volume. No host directories or Docker socket are mounted, and privileged mode
+is disabled. The terminal runs as root with four CPUs and 6 GB RAM.
+
+## Hermes and OpenClaw boundaries
 
 - No host directories, Docker socket, published host ports, privileged mode,
   host networking, NVPN software, or VPN membership.
@@ -108,10 +146,10 @@ For diagnostics, the agent's `iris-bridge/last-error.log` and
 
 ```sh
 python3 -m unittest discover -s tests -p 'test_*.py' -v
-./iris-agents check
+./agents check
 ```
 
-`check` probes live network isolation and allowed internet/model access from
+`check hermes` and `check openclaw` probe live network isolation and allowed internet/model access from
 both agents, then inspects mounts, capabilities, privileges and port bindings.
 It does not run model inference or send messages. For an inference/tool smoke
 test, run `/opt/iris-agent/worker.py probe` with Python inside either agent and
