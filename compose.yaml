@@ -1,0 +1,131 @@
+name: iris-agents
+x-common: &common
+  restart: unless-stopped
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  logging:
+    driver: json-file
+    options: {max-size: 10m, max-file: '3'}
+x-guard: &guard
+  <<: *common
+  image: iris-agent-support:local
+  platform: linux/amd64
+  cap_add: [NET_ADMIN]
+  read_only: true
+  tmpfs: [/tmp]
+  command: [python3, /opt/iris-agent/guard.py]
+  environment:
+    BLOCK_HOST_IPS: ${BLOCK_HOST_IPS:-}
+  healthcheck:
+    test: [CMD, test, -f, /tmp/ready]
+    interval: 3s
+    timeout: 2s
+    retries: 10
+  mem_limit: 128m
+x-iris: &iris
+  <<: *common
+  image: iris-agent-iris:local
+  platform: linux/amd64
+  read_only: true
+  tmpfs: [/tmp, /run]
+  mem_limit: 1g
+  cpus: 1.5
+  environment:
+    IRIS_CHAT_SAME_HOST_HASHTREE: '0'
+    IRIS_CHAT_FIPS_ENABLE_WEBRTC: '0'
+    IRIS_CHAT_FIPS_STATIC_PEERS: ''
+    IRIS_CHAT_FIPS_ROUTED_PEERS: ''
+    IRIS_CHAT_FIPS_TRUSTED_RATERS: ''
+    IRIS_CHAT_FIPS_LOCAL_RENDEZVOUS_ADDR: ''
+services:
+  model-gate:
+    <<: *common
+    image: iris-agent-support:local
+    platform: linux/amd64
+    read_only: true
+    tmpfs: [/tmp]
+    command: [python3, /opt/iris-agent/model_gate.py]
+    environment:
+      KAT_MODEL: ${KAT_MODEL:?Set KAT_MODEL in .env}
+    networks:
+      agents: {ipv4_address: 172.30.240.2}
+    mem_limit: 256m
+  hermes-net:
+    <<: *guard
+    networks:
+      agents: {ipv4_address: 172.30.240.10}
+  openclaw-net:
+    <<: *guard
+    networks:
+      agents: {ipv4_address: 172.30.240.20}
+  hermes-iris:
+    <<: *iris
+    network_mode: service:hermes-net
+    depends_on:
+      hermes-net: {condition: service_healthy}
+    environment:
+      AGENT_NAME: Hermes
+      IRIS_CHAT_SAME_HOST_HASHTREE: '0'
+      IRIS_CHAT_FIPS_ENABLE_WEBRTC: '0'
+      IRIS_CHAT_FIPS_STATIC_PEERS: ''
+      IRIS_CHAT_FIPS_ROUTED_PEERS: ''
+      IRIS_CHAT_FIPS_TRUSTED_RATERS: ''
+      IRIS_CHAT_FIPS_LOCAL_RENDEZVOUS_ADDR: ''
+    volumes: [hermes-iris:/state]
+  openclaw-iris:
+    <<: *iris
+    network_mode: service:openclaw-net
+    depends_on:
+      openclaw-net: {condition: service_healthy}
+    environment:
+      AGENT_NAME: OpenClaw
+      IRIS_CHAT_SAME_HOST_HASHTREE: '0'
+      IRIS_CHAT_FIPS_ENABLE_WEBRTC: '0'
+      IRIS_CHAT_FIPS_STATIC_PEERS: ''
+      IRIS_CHAT_FIPS_ROUTED_PEERS: ''
+      IRIS_CHAT_FIPS_TRUSTED_RATERS: ''
+      IRIS_CHAT_FIPS_LOCAL_RENDEZVOUS_ADDR: ''
+    volumes: [openclaw-iris:/state]
+  hermes:
+    <<: *common
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, FSETID, KILL, SETGID, SETUID, SETPCAP, NET_BIND_SERVICE, SYS_CHROOT, SETFCAP, AUDIT_WRITE]
+    image: iris-agent-hermes:local
+    init: true
+    network_mode: service:hermes-net
+    depends_on:
+      hermes-net: {condition: service_healthy}
+    environment:
+      AGENT_BACKEND: hermes
+      HERMES_DOCKER_EXEC_AS_ROOT: '1'
+      HERMES_ALLOW_ROOT_GATEWAY: '1'
+      KAT_MODEL: ${KAT_MODEL}
+    volumes: [hermes-data:/opt/data, hermes-workspace:/workspace]
+    mem_limit: 5g
+    cpus: 3
+    pids_limit: 512
+  openclaw:
+    <<: *common
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, FSETID, KILL, SETGID, SETUID, SETPCAP, NET_BIND_SERVICE, SYS_CHROOT, SETFCAP, AUDIT_WRITE]
+    image: iris-agent-openclaw:local
+    init: true
+    network_mode: service:openclaw-net
+    depends_on:
+      openclaw-net: {condition: service_healthy}
+    environment:
+      AGENT_BACKEND: openclaw
+      KAT_MODEL: ${KAT_MODEL}
+    volumes: [openclaw-data:/data, openclaw-workspace:/workspace]
+    mem_limit: 4g
+    cpus: 3
+    pids_limit: 512
+networks:
+  agents:
+    ipam:
+      config: [{subnet: 172.30.240.0/24}]
+volumes:
+  hermes-data:
+  hermes-workspace:
+  hermes-iris:
+  openclaw-data:
+  openclaw-workspace:
+  openclaw-iris:

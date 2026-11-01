@@ -1,0 +1,5 @@
+FROM iris-agent-support:local
+ARG IRIS_SHA256=e4da5384fb713546db2af1f3b087fdc134ee1d4e73e40d6d32cb1643280037eb
+RUN curl -fsSL --retry 3 'https://upload.iris.to/npub1399g0q2gtwjcglyjcg3jw3rcllqhm375pwases5hkvqa56aqe5wsz2eaap/releases%2Firis-chat-rs/v2026.10.30/assets/iris-v2026.10.30-x86_64-unknown-linux-gnu.tar.gz' -o /tmp/iris.tar.gz && echo "$IRIS_SHA256  /tmp/iris.tar.gz" | sha256sum -c - && tar -xzf /tmp/iris.tar.gz -C /tmp && install -m755 /tmp/iris/iris /usr/local/bin/iris && rm -rf /tmp/iris /tmp/iris.tar.gz && iris --version
+ENV HOME=/state IRIS_DATA_DIR=/state/profile PYTHONUNBUFFERED=1
+CMD ["python3", "/opt/iris-agent/broker.py"]
