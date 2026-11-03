@@ -74,6 +74,21 @@ class Routing(unittest.TestCase):
         with patch.object(cli.opencode.shutil,'which',return_value='/mock/docker'), patch.object(cli.opencode.subprocess,'run',side_effect=run), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(cli.opencode.main(['up']),0)
 
+    def test_opencode_default_prefers_installed_kat(self):
+        kat = cli.opencode.MODELS['kat']
+        qwen = cli.opencode.MODELS['qwen']
+        for installed, expected in [([kat], kat), ([qwen, kat], kat), ([qwen], qwen)]:
+            tags = json.dumps({'models': [{'name': name} for name in installed]}).encode()
+            output = io.StringIO()
+            with self.subTest(installed=installed), \
+                    patch.object(cli.opencode.shutil, 'which', return_value='/mock/docker'), \
+                    patch.object(cli.opencode.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)), \
+                    patch.object(cli.opencode.subprocess, 'call', return_value=0), \
+                    patch.object(cli.opencode.urllib.request, 'urlopen', return_value=io.BytesIO(tags)), \
+                    contextlib.redirect_stdout(output):
+                self.assertEqual(cli.opencode.main(['--doctor']), 0)
+                self.assertIn(expected, output.getvalue())
+
     def test_pairing_passes_invite_on_stdin(self):
         with patch.object(cli.chat,'compose') as compose:
             cli.chat.main('pair','hermes',owner='owner',invite='private-invite')

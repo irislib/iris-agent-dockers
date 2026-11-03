@@ -84,7 +84,8 @@ previous values (or remove both settings if they were unset) and recreate the sa
 ## OpenCode
 
 `agents opencode` reconnects to the existing `work` tmux session. Inside it, run
-`opencode`; choose the local model using `/models`. Detach with Ctrl+B, then D.
+`opencode`. It defaults to local KAT-Coder V2.5 Dev (Q4_K_M). Use `/models` to
+choose another configured model. Detach with Ctrl+B, then D.
 OpenCode, its installed tools and tmux stay in the persistent container. A stop
 ends running processes but preserves the container and its named volumes.
 

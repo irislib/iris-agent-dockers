@@ -11,8 +11,8 @@ import urllib.request
 
 IMAGE = 'docker/sandbox-templates:opencode@sha256:7feb9784bc882dbe014888becb65c23e7fb1d1b24169a68d33660fe44476a0b4'
 MODELS = {
-    'qwen': 'qwen3.8:27b-mlx',
     'kat': 'hf.co/bartowski/Kwaipilot_KAT-Coder-V2.5-Dev-GGUF:Q4_K_M',
+    'qwen': 'qwen3.8:27b-mlx',
 }
 
 
@@ -31,20 +31,20 @@ def main(argv=None):
         parser.exit(1, 'Docker is missing. Install/start Docker Desktop first.\n')
     if subprocess.run(['docker', 'info'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         parser.exit(1, 'Start Docker Desktop, then retry.\n')
-    model = MODELS['qwen']
-    if args.doctor:
+    available = {MODELS['kat']}
+    if args.doctor or args.command == 'shell':
         try:
             with urllib.request.urlopen('http://127.0.0.1:11434/api/tags', timeout=5) as response:
-                installed = {m['name'] for m in json.load(response)['models']}
-        except Exception as error:
-            parser.exit(1, f'Cannot reach local Ollama. Open Ollama and retry. ({error})\n')
-        model = MODELS['qwen']
-        if model not in installed:
+                available = {item['name'] for item in json.load(response)['models']}
+        except (OSError, ValueError, KeyError) as error:
+            if args.doctor:
+                parser.exit(1, f'Cannot reach local Ollama. Open Ollama and retry. ({error})\n')
+    model = next((name for name in MODELS.values() if name in available), MODELS['kat'])
+    if args.doctor:
+        if model not in available:
             parser.exit(1, f'Model not installed: {model}\nInstall it in Ollama first.\n')
-        if args.doctor:
-            for alias, name in MODELS.items():
-                print(f'{alias}: {"installed" if name in installed else "missing"}', flush=True)
-            return subprocess.call(['docker', 'run', '--rm', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--entrypoint', 'sh', IMAGE, '-c', 'opencode --version && curl -fsS --max-time 10 http://host.docker.internal:11434/api/tags >/dev/null && echo "Container → Ollama: OK"'])
+        print(f'Installed default: {model}', flush=True)
+        return subprocess.call(['docker', 'run', '--rm', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--entrypoint', 'sh', IMAGE, '-c', 'opencode --version && curl -fsS --max-time 10 http://host.docker.internal:11434/api/tags >/dev/null && echo "Container → Ollama: OK"'])
     identity = 'isolated-' + args.workspace
     config = {
         '$schema': 'https://opencode.ai/config.json',
@@ -58,7 +58,7 @@ def main(argv=None):
             'npm': '@ai-sdk/openai-compatible',
             'name': 'Ollama local',
             'options': {'baseURL': 'http://host.docker.internal:11434/v1'},
-            'models': {name: {'name': alias.upper(), 'limit': {'context': 65536, 'output': 8192}} for alias, name in MODELS.items()},
+            'models': {name: {'name': alias.upper(), 'limit': {'context': 65536, 'output': 8192}} for alias, name in MODELS.items() if name == model or name in available},
         }},
     }
     name = 'oc-local-' + identity
@@ -116,7 +116,6 @@ p.write_text(json.dumps(cfg, indent=2) + '\\n')
                '--env', 'HOME=/home/agent',
                '--env', 'NVPN_CONFIG_PATH=/var/lib/oc-local-nvpn/config.toml',
                '--workdir', '/home/agent/workspace',
-               '--env', 'OPENCODE_CONFIG_CONTENT=' + json.dumps(config),
                '--env', 'TERM=' + (os.environ.get('TERM') if os.environ.get('TERM') not in (None, '', 'dumb') else 'xterm-256color')]
     if sys.stdin.isatty() and sys.stdout.isatty():
         command.append('--tty')
