@@ -47,11 +47,12 @@ def configure():
     else:
         root=HOME/'.openclaw';root.mkdir(exist_ok=True)
         cfg=root/'openclaw.json'
-        if not cfg.exists():
-            cfg.write_text(json.dumps({'models':{'providers':{'ollama':{'baseUrl':'http://172.30.240.2:11434','api':'ollama','apiKey':'ollama-local','models':[{'id':MODEL,'name':'Local KAT','reasoning':False,'input':['text'],'contextWindow':65536,'maxTokens':4096,'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0}}]}}},
-                'agents':{'defaults':{'model':{'primary':'ollama/'+MODEL},'workspace':'/workspace','skipBootstrap':True,'timeoutSeconds':1200,'heartbeat':{'every':'0m'}}},
-                'tools':{'profile':'full','exec':{'host':'gateway','security':'full','ask':'off'}},
-                'memory':{'search':{'enabled':False}},'gateway':{'mode':'local'},'update':{'checkOnStart':False}},indent=2))
+        # Seed the workspace once. Preserve files the operator deliberately removed.
+        if cfg.exists(): return
+        cfg.write_text(json.dumps({'models':{'providers':{'ollama':{'baseUrl':'http://172.30.240.2:11434','api':'ollama','apiKey':'ollama-local','models':[{'id':MODEL,'name':'Local KAT','reasoning':False,'input':['text'],'contextWindow':65536,'maxTokens':4096,'cost':{'input':0,'output':0,'cacheRead':0,'cacheWrite':0}}]}}},
+            'agents':{'defaults':{'model':{'primary':'ollama/'+MODEL},'workspace':'/workspace','skipBootstrap':True,'timeoutSeconds':1200,'heartbeat':{'every':'0m'}}},
+            'tools':{'profile':'full','exec':{'host':'gateway','security':'full','ask':'off'}},
+            'memory':{'search':{'enabled':False}},'gateway':{'mode':'local'},'update':{'checkOnStart':False}},indent=2))
         soul=Path('/workspace/SOUL.md')
     if not soul.exists(): soul.write_text(instructions)
 

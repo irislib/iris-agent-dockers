@@ -76,6 +76,11 @@ idle and explicitly recreate the affected services with Docker Compose; their
 named volumes retain workspaces, conversations and identities. Do not remove volumes unless you intend to lose that state.
 Do not use `docker compose down -v` as a restart command.
 
+To switch OpenClaw to a fresh profile while keeping its Iris pairing, stop OpenClaw,
+set `OPENCLAW_DATA_VOLUME` and `OPENCLAW_WORKSPACE_VOLUME` in `.env` to two new volume names,
+and recreate just the `openclaw` service. To recover the previous profile, restore the
+previous values (or remove both settings if they were unset) and recreate the same service.
+
 ## OpenCode
 
 `agents opencode` reconnects to the existing `work` tmux session. Inside it, run

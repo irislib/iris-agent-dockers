@@ -127,5 +127,7 @@ volumes:
   hermes-workspace:
   hermes-iris:
   openclaw-data:
+    name: ${OPENCLAW_DATA_VOLUME:-${COMPOSE_PROJECT_NAME:-iris-agents}_openclaw-data}
   openclaw-workspace:
+    name: ${OPENCLAW_WORKSPACE_VOLUME:-${COMPOSE_PROJECT_NAME:-iris-agents}_openclaw-workspace}
   openclaw-iris:
