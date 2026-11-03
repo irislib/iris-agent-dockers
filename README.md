@@ -131,6 +131,8 @@ interrupted rather than replayed. After handoff, the native gateway owns its
 queue, sessions and recovery. Reply intent is recorded before sending;
 retries inspect Iris history rather than blindly resending.
 
+When a tool asks for permission, use Reply on that message and type one of its choices.
+
 Typing stays active while processing, including tool calls, and clears after
 completion, failure or stop. Iris expires a stale indicator if connectivity is lost.
 
@@ -154,7 +156,7 @@ workspaces, models and stored conversations are retained. The transport's
 
 - Hermes official image: v0.22.5, source `bf0203a794a07aac3ff764972ab9087baa4e4f4e`.
 - OpenClaw official image: 2026.10.9, source `8b18b5578f66eab1501cba4cef2310d88bfb9a41`.
-- Iris channel plugins: v0.1.0, source `e52a5a95c770472d45e8ff3a9b706faab28ecf7e`;
+- Iris channel plugins: v0.2.2, source `86ac4f4ddd696e7e2df4b737ea0251c0be5272c1`;
   both archives are pinned by SHA-256 and verified before extraction.
 - Both upstream images and the Debian support image are pinned by OCI digest in
   the Dockerfiles. Support packages use the signed Debian snapshot from
